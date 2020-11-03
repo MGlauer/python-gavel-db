@@ -125,7 +125,13 @@ def store_file(path, parser, compiler, session=None):
                     parser.parse_single_from_string, parser.stream_formulas(path)
                 ):
                     i += 1
-                    store_formula(path, compiler.visit(struc), session=session, source=source, skip_existence_check=created)
+                    store_formula(
+                        path,
+                        compiler.visit(struc),
+                        session=session,
+                        source=source,
+                        skip_existence_check=created,
+                    )
                 mark_source_complete(path, session=session)
                 print("%d formulas extracted" % i)
                 print("commit to database")

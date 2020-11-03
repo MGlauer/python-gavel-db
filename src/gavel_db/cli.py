@@ -32,9 +32,11 @@ ROOT_DIR = os.path.dirname(__file__)
 alembic_cfg = Config(os.path.join(ROOT_DIR, "alembic.ini"))
 alembic_cfg.set_main_option("script_location", os.path.join(ROOT_DIR, "alembic"))
 
+
 @click.group()
 def db():
     pass
+
 
 @click.command()
 @click.argument("path", default=None)
@@ -43,6 +45,7 @@ def store(path, r):
     parser = TPTPParser()
     compiler = DBCompiler()
     store_all(path, parser, compiler)
+
 
 @click.command()
 @click.option("-p", default=settings.TPTP_ROOT)
@@ -71,10 +74,12 @@ def clear_db(p):
     command.downgrade(alembic_cfg, "base")
     command.upgrade(alembic_cfg, "head")
 
+
 @click.command()
 def migrate_db():
     """Create tables for storage of formulas"""
     command.upgrade(alembic_cfg, "head")
+
 
 db.add_command(migrate_db)
 db.add_command(drop_db)

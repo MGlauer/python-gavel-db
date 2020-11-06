@@ -127,7 +127,7 @@ def store_file(path, parser, compiler, session=None):
                     i += 1
                     store_formula(
                         path,
-                        compiler.visit(struc),
+                        compiler.visit_annotated_formula(struc, root=True),
                         session=session,
                         source=source,
                         skip_existence_check=created,

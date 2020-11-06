@@ -22,11 +22,11 @@ class DBCompiler(Compiler):
             return dict(type="formula_role", formula_role="corollary")
         elif role == problem.FormulaRole.DEFINITION:
             return dict(type="formula_role", formula_role="definition")
-        elif role == problem.FormulaRole.FI_DOMAIN:
+        elif role == problem.FormulaRole.FINITE_INTERPRETATION_DOMAIN:
             return dict(type="formula_role", formula_role="fi_domain")
-        elif role == problem.FormulaRole.FI_FUNCTORS:
+        elif role == problem.FormulaRole.FINITE_INTERPRETATION_FUNCTORS:
             return dict(type="formula_role", formula_role="fi_functors")
-        elif role == problem.FormulaRole.FI_PREDICATES:
+        elif role == problem.FormulaRole.FINITE_INTERPRETATION_PREDICATES:
             return dict(type="formula_role", formula_role="fi_predicates")
         elif role == problem.FormulaRole.HYPOTHESIS:
             return dict(type="formula_role", formula_role="hypothesis")
@@ -68,7 +68,7 @@ class DBCompiler(Compiler):
             variables=[self.visit(v) for v in formula.variables],
         )
 
-    def visit_annotated_formula(self, anno: problem.AnnotatedFormula, root=True):
+    def visit_annotated_formula(self, anno: problem.AnnotatedFormula, root=False):
         if root:
             return Formula(
                 json=self.visit(anno.formula),
@@ -127,9 +127,9 @@ class DBCompiler(Compiler):
         return dict(
             type="problem",
             premises=[
-                self.visit_annotated_formula(p, root=False) for p in problem.premises
+                self.visit_annotated_formula(p, root=True) for p in problem.premises
             ],
-            conjecture=self.visit(problem.conjecture),
+            conjecture=self.visit_annotated_formula(problem.conjecture, root=True),
         )
 
     def visit_let(self, expression: fol.Let):

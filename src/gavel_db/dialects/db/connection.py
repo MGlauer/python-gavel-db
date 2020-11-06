@@ -8,7 +8,7 @@ DB_CONNECTION = dict(
     user=os.environ.get("GAVEL_DB_USER", ""),
     password=os.environ.get("GAVEL_DB_PASSWORD", ""),
     host=os.environ.get("GAVEL_DB_HOST", ""),
-    port=os.environ.get("GABEL_DB_PORT", ""),
+    port=os.environ.get("GAVEL_DB_PORT", ""),
     database=os.environ.get("GAVEL_DB_NAME", ":memory:"),
 )
 
@@ -18,7 +18,7 @@ __ENGINE__ = None
 def get_url():
     cred = DB_CONNECTION.get("user", "")
     if cred:
-        if "password" in DB_CONNECTION:
+        if DB_CONNECTION.get("password"):
             cred = "{user}:{password}".format(**DB_CONNECTION)
         cred += "@"
 

@@ -48,20 +48,6 @@ def store(path, r):
 
 
 @click.command()
-@click.option("-p", default=settings.TPTP_ROOT)
-def store_problems(p):
-    settings.TPTP_ROOT = p
-    build_tptp.store_problems()
-
-
-@click.command()
-@click.option("-p", default=settings.TPTP_ROOT)
-def store_solutions(p):
-    """Drop tables created gy init-db"""
-    build_tptp.all_solution(p)
-
-
-@click.command()
 def drop_db():
     """Drop tables created gy init-db"""
     command.downgrade(alembic_cfg, "base")
@@ -84,8 +70,6 @@ def migrate_db():
 db.add_command(migrate_db)
 db.add_command(drop_db)
 db.add_command(clear_db)
-db.add_command(store_problems)
 db.add_command(store)
-db.add_command(store_solutions)
 
 cli.add_source(db)

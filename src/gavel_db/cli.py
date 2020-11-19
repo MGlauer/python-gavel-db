@@ -14,16 +14,16 @@ Why does this file exist, and why not put this in __main__?
 
   Also see (1) from http://click.pocoo.org/5/setuptools/#setuptools-integration
 """
+__all__ = ["db"]
 import os
 
-from gavel.cli import cli
 import gavel.config.settings as settings
-from gavel.dialects.tptp.parser import TPTPParser
+from gavel.dialects.tptp.parser import TPTPProblemParser
 from gavel_db.dialects.db.structures import (
-    store_all,
+    store_all
 )
-from gavel_db.dialects.db.compiler import DBCompiler
-
+from gavel_db.dialects.db.compiler import JSONCompiler
+from gavel_db.dialects.db.structures import store_all_solutions, store_problem
 import click
 from alembic import command
 from alembic.config import Config
@@ -41,10 +41,16 @@ def db():
 @click.command()
 @click.argument("path", default=None)
 @click.option("-r", default=False)
-def store(path, r):
-    parser = TPTPParser()
-    compiler = DBCompiler()
-    store_all(path, parser, compiler)
+def store_problems(path, r):
+    parser = TPTPProblemParser()
+    compiler = JSONCompiler()
+    store_all(path, parser, store_problem, compiler)
+    print("Done:", path)
+
+
+@click.command()
+def store_solutions():
+    store_all_solutions()
 
 
 @click.command()
@@ -70,6 +76,6 @@ def migrate_db():
 db.add_command(migrate_db)
 db.add_command(drop_db)
 db.add_command(clear_db)
-db.add_command(store)
+db.add_command(store_problems)
+db.add_command(store_solutions)
 
-cli.add_source(db)

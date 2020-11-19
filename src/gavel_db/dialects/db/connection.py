@@ -14,7 +14,6 @@ DB_CONNECTION = dict(
 
 __ENGINE__ = None
 
-
 def get_url():
     cred = DB_CONNECTION.get("user", "")
     if cred:
@@ -45,14 +44,17 @@ def with_session(wrapped_function):
             Session = sessionmaker(bind=engine)
             session = Session()
             try:
-                return wrapped_function(*args, session=session, **kwargs)
+                result = wrapped_function(*args, session=session, **kwargs)
+                session.commit()
             except:
                 session.rollback()
                 raise
             finally:
+                session.flush()
                 session.close()
         else:
-            return wrapped_function(*args, **kwargs)
+            result = wrapped_function(*args, **kwargs)
+        return result
 
     return inside
 

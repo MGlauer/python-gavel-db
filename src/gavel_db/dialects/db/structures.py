@@ -3,8 +3,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relation
 from sqlalchemy.orm import relationship
 from gavel_db.dialects.db.connection import with_session, get_or_create, get_or_None
-from gavel.logic.problem import AnnotatedFormula
-
+from gavel_db.dialects.db.compiler import JSONCompiler
+from gavel.logic import problem
+from gavel.dialects.tptp.parser import _load_solution, parse_solution, TPTPProblemParser
+from gavel.config import settings as settings
 import os
 import multiprocessing as mp
 
@@ -47,25 +49,29 @@ class SolutionItem(Base):
     solution = relationship("Solution")
     premise_id = sqla.Column(sqla.Integer, sqla.ForeignKey(Formula.id), nullable=False)
     premise = relationship(Formula)
-    used = sqla.Column(sqla.Boolean)
 
 
 class Problem(Base):
     __tablename__ = "problem"
     id = sqla.Column(sqla.Integer, primary_key=True)
+    domain = sqla.Column(sqla.VARCHAR(4))
     source_id = sqla.Column(sqla.Integer, sqla.ForeignKey(Source.id), nullable=False)
     source = relationship(Source)
     conjecture_id = sqla.Column(
         sqla.Integer, sqla.ForeignKey(Formula.id), nullable=False
     )
     conjecture = relationship(Formula)
-    premises = relation(Formula, secondary=association_premises)
+    imports = relation(Source)
+    original_premises = relationship(Formula, secondary=association_premises)
     solutions = relation("Solution")
+
+    __table_args__ = (
+        sqla.UniqueConstraint('source_id', 'conjecture_id', name='conjecture_source'),
+    )
 
     def create_problem_file(self, file):
         for premise in self.premises:
             file.write(premise.original)
-
 
 class Solution(Base):
     __tablename__ = "solution"
@@ -75,17 +81,16 @@ class Solution(Base):
     premises = relation(SolutionItem)
 
 
-@with_session
 def store_formula(
     source_name,
-    struc: AnnotatedFormula,
+    struc: problem.AnnotatedFormula,
     session=None,
     source=None,
     skip_existence_check=False,
 ):
     created = skip_existence_check
     structure = None
-
+    compiler = JSONCompiler()
     if source is None:
         source, created = get_or_create(session, Source, path=source_name)
     # If the source object was already in the database, the formula might
@@ -93,70 +98,95 @@ def store_formula(
     if not created and not skip_existence_check:
         structure = get_or_None(session, Formula, name=struc.name, source=source)
     if structure is None:
-        struc.source = source
-        session.add(struc)
-        return True
-    else:
-        return False
+        structure = Formula(
+            json=compiler.visit(struc.formula),
+            name=compiler.visit(struc.name),
+            logic=compiler.visit(struc.logic),
+        )
+        structure.source = source
+        session.add(structure)
+    return structure
 
 
-def store_all(path, parser, compiler):
+@with_session
+def store_problem(parser, problem_path: str, session=None):
+    fname = os.path.basename(problem_path)
+    if "=" not in fname and "^" not in fname and "_" not in fname and fname.endswith(".p"):
+        source_name = problem_path
+        source, new_source = get_or_create(session, Source, path=source_name)
+        if new_source:
+            print(problem_path)
+            for problem in parser.parse_from_file(problem_path):
+                original_premises = [store_formula(source_name, premise, session=session) for premise in problem.premises]
+                conjecture = store_formula(source_name, problem.conjecture, session=session)
+                imports = []
+                for imp in problem.imports:
+                    sub, new_source = get_or_create(session, Source, path=imp.path)
+                    if new_source:
+                        store_file(os.path.join(settings.TPTP_ROOT,imp.path), parser.logic_parser, JSONCompiler(), session=session)
+                    imports.append(sub)
+                p = Problem(source=source, original_premises=original_premises, conjecture=conjecture)
+                session.add(p)
+
+
+def store_all(path, parser, processor, compiler):
     if os.path.isdir(path):
         for sub_path in os.listdir(path):
             sub_path = os.path.join(path, sub_path)
             if os.path.isfile(sub_path):
-                store_file(sub_path, parser, compiler)
+                processor(parser, sub_path)
+            else:
+                store_all(sub_path, parser, processor, compiler)
     elif os.path.isfile(path):
-        store_file(path, parser, compiler)
+        processor(parser, path)
 
 
-@with_session
 def store_file(path, parser, compiler, session=None):
-    skip = False
-    skip_reason = None
-    print(path)
     fname = os.path.basename(path)
-    if "=" not in fname and "^" not in fname and "_" not in fname:
+    if "=" not in fname and "^" not in fname and "_" not in fname and fname[-2:] == ".p":
         source, created = get_or_create(session, Source, path=path)
         if not source.complete:
             i = 0
-            with mp.Pool(mp.cpu_count() - 1) as pool:
-                for struc in pool.imap(
-                    parser.parse_single_from_string, parser.stream_formulas(path)
-                ):
-                    i += 1
-                    store_formula(
-                        path,
-                        compiler.visit_annotated_formula(struc, root=True),
-                        session=session,
-                        source=source,
-                        skip_existence_check=created,
-                    )
-                mark_source_complete(path, session=session)
-                print("%d formulas extracted" % i)
-                print("commit to database")
-                print("--- done ---")
-                session.commit()
-
+            for struc in map(
+                parser.parse_single_from_string, parser.stream_formulas(path)
+            ):
+                i += 1
+                store_formula(
+                    path,
+                    struc,
+                    session=session,
+                    source=source,
+                    skip_existence_check=created,
+                )
+            mark_source_complete(path, session=session)
         else:
             skip = True
             skip_reason = "Already complete"
     else:
         skip = True
         skip_reason = "Not supported"
-    if skip:
-        print("--- Skipping - Reason: %s ---" % skip_reason)
 
 
-@with_session
 def mark_source_complete(source, session=None):
     session.query(Source).filter_by(path=source).update({"complete": True})
-    session.commit()
 
 
-@with_session
 def is_source_complete(source, session=None):
     source_obj = get_or_None(session, Source, path=source)
     if source_obj is None:
         return False
     return source_obj.complete
+
+
+def load_solution_from_problem(problem):
+    _load_solution(problem.domain, problem.name)
+    return problem,
+
+
+@with_session
+def store_all_solutions(session):
+    for problem, solution in map(parse_solution, map(load_solution_from_problem, session.query(Problem))):
+        s = Solution()
+        for ax in (a for a in problem.original_premises if a in solution.used_axioms):
+            session.add(SolutionItem(solution=s, premise=ax))
+        session.add(s)

@@ -1,10 +1,9 @@
 import gavel.logic.logic as fol
 from gavel.dialects.base.compiler import Compiler
 from gavel.logic import problem
-from gavel_db.dialects.db.structures import Formula
 
 
-class DBCompiler(Compiler):
+class JSONCompiler(Compiler):
     def visit_quantifier(self, quantifier: fol.Quantifier):
         if quantifier.is_existential():
             return dict(type="quantifier", quantifier="existential")
@@ -69,20 +68,13 @@ class DBCompiler(Compiler):
         )
 
     def visit_annotated_formula(self, anno: problem.AnnotatedFormula, root=False):
-        if root:
-            return Formula(
-                json=self.visit(anno.formula),
-                name=self.visit(anno.name),
-                logic=self.visit(anno.logic),
-            )
-        else:
-            return dict(
-                type="annotated_formula",
-                formula=self.visit(anno.formula),
-                name=self.visit(anno.name),
-                role=self.visit(anno.role),
-                logic=self.visit(anno.logic),
-            )
+        return dict(
+            type="annotated_formula",
+            formula=self.visit(anno.formula),
+            name=self.visit(anno.name),
+            role=self.visit(anno.role),
+            logic=self.visit(anno.logic),
+        )
 
     def visit_binary_formula(self, formula: fol.BinaryFormula):
         return dict(
@@ -161,9 +153,12 @@ class DBCompiler(Compiler):
         return t.name
 
     def visit_defined_constant(self, obj: fol.DefinedConstant):
-        if obj == fol.DefinedConstant.VERUM:
+        return self.visit(obj.value)
+
+    def visit_predefined_constant(self, obj: fol.PredefinedConstant):
+        if obj == fol.PredefinedConstant.VERUM:
             return "$true"
-        elif obj == fol.DefinedConstant.FALSUM:
+        elif obj == fol.PredefinedConstant.FALSUM:
             return "$false"
         else:
             raise NotImplementedError

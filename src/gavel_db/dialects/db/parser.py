@@ -110,7 +110,8 @@ class DBLogicParser(LogicParser):
         return logic.Constant(symbol=variable["symbol"])
 
     def parse_problem(self, problem: dict) -> problem.Problem:
-        return logic.Problem(
+        return problem.Problem(
             premises=[self._parse_rec(p) for p in problem["premises"]],
             conjecture=self._parse_rec(problem["conjecture"]),
+            imports=self._parse_rec(problem["imports"]),
         )

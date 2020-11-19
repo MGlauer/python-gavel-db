@@ -34,6 +34,9 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+from gavel_db.dialects.db.connection import get_engine
+
+
 
 def run_migrations_offline():
     """Run migrations in 'offline' mode.
@@ -47,6 +50,7 @@ def run_migrations_offline():
     script output.
 
     """
+    print("Offline")
     url = get_url()
     context.configure(
         url=url,
@@ -66,10 +70,9 @@ def run_migrations_online():
     and associate a connection with the context.
 
     """
-    c = config.get_section(config.config_ini_section)
-    c["sqlalchemy.url"] = get_url()
-    connectable = engine_from_config(c, prefix="sqlalchemy.", poolclass=pool.NullPool)
 
+    connectable = get_engine()
+    print(connectable)
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
 

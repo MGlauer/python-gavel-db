@@ -37,7 +37,6 @@ target_metadata = Base.metadata
 from gavel_db.dialects.db.connection import get_engine
 
 
-
 def run_migrations_offline():
     """Run migrations in 'offline' mode.
 

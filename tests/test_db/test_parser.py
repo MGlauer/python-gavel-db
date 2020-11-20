@@ -26,6 +26,7 @@ class TestProcessor(TPTPParser):
             print(reconstructed)
         return internal
 
+
 axioms = ["GRP001-0.ax"]
 
 problems = ["ALG/ALG001-1.p", "NUN/NUN030^1.p"]
@@ -39,5 +40,3 @@ class DBTest(unittest.TestCase):
     @classmethod
     def teardown_class(cls):
         fol_db.drop_tables()
-
-

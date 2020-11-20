@@ -66,12 +66,13 @@ class Problem(Base):
     solutions = relation("Solution")
 
     __table_args__ = (
-        sqla.UniqueConstraint('source_id', 'conjecture_id', name='conjecture_source'),
+        sqla.UniqueConstraint("source_id", "conjecture_id", name="conjecture_source"),
     )
 
     def create_problem_file(self, file):
         for premise in self.premises:
             file.write(premise.original)
+
 
 class Solution(Base):
     __tablename__ = "solution"
@@ -111,21 +112,40 @@ def store_formula(
 @with_session
 def store_problem(parser, problem_path: str, session=None):
     fname = os.path.basename(problem_path)
-    if "=" not in fname and "^" not in fname and "_" not in fname and fname.endswith(".p"):
+    if (
+        "=" not in fname
+        and "^" not in fname
+        and "_" not in fname
+        and fname.endswith(".p")
+    ):
         source_name = problem_path
         source, new_source = get_or_create(session, Source, path=source_name)
         if new_source:
             print(problem_path)
             for problem in parser.parse_from_file(problem_path):
-                original_premises = [store_formula(source_name, premise, session=session) for premise in problem.premises]
-                conjecture = store_formula(source_name, problem.conjecture, session=session)
+                original_premises = [
+                    store_formula(source_name, premise, session=session)
+                    for premise in problem.premises
+                ]
+                conjecture = store_formula(
+                    source_name, problem.conjecture, session=session
+                )
                 imports = []
                 for imp in problem.imports:
                     sub, new_source = get_or_create(session, Source, path=imp.path)
                     if new_source:
-                        store_file(os.path.join(settings.TPTP_ROOT,imp.path), parser.logic_parser, JSONCompiler(), session=session)
+                        store_file(
+                            os.path.join(settings.TPTP_ROOT, imp.path),
+                            parser.logic_parser,
+                            JSONCompiler(),
+                            session=session,
+                        )
                     imports.append(sub)
-                p = Problem(source=source, original_premises=original_premises, conjecture=conjecture)
+                p = Problem(
+                    source=source,
+                    original_premises=original_premises,
+                    conjecture=conjecture,
+                )
                 session.add(p)
 
 
@@ -143,7 +163,12 @@ def store_all(path, parser, processor, compiler):
 
 def store_file(path, parser, compiler, session=None):
     fname = os.path.basename(path)
-    if "=" not in fname and "^" not in fname and "_" not in fname and fname[-2:] == ".p":
+    if (
+        "=" not in fname
+        and "^" not in fname
+        and "_" not in fname
+        and fname[-2:] == ".p"
+    ):
         source, created = get_or_create(session, Source, path=path)
         if not source.complete:
             i = 0
@@ -180,12 +205,14 @@ def is_source_complete(source, session=None):
 
 def load_solution_from_problem(problem):
     _load_solution(problem.domain, problem.name)
-    return problem,
+    return (problem,)
 
 
 @with_session
 def store_all_solutions(session):
-    for problem, solution in map(parse_solution, map(load_solution_from_problem, session.query(Problem))):
+    for problem, solution in map(
+        parse_solution, map(load_solution_from_problem, session.query(Problem))
+    ):
         s = Solution()
         for ax in (a for a in problem.original_premises if a in solution.used_axioms):
             session.add(SolutionItem(solution=s, premise=ax))

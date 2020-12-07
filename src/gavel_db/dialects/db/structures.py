@@ -1,10 +1,10 @@
 import sqlalchemy as sqla
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relation
 from sqlalchemy.orm import relationship
 from gavel_db.dialects.db.connection import with_session, get_or_create, get_or_None
 from gavel_db.dialects.db.compiler import JSONCompiler
-from gavel.logic import problem
+from gavel.logic import problem as tptp_problem
+from gavel.dialects.base.parser import ProofParser
 from gavel.dialects.tptp.parser import _load_solution, parse_solution, TPTPProblemParser
 from gavel.config import settings as settings
 import os
@@ -28,6 +28,8 @@ class Formula(Base):
     source = relationship(Source)
     logic = sqla.VARCHAR(4)
     json = sqla.Column(sqla.JSON)
+    problem_id = sqla.Column(sqla.Integer, sqla.ForeignKey('problem.id'))
+    conjecture_in_problem = relationship('Problem', back_populates="conjectures")
 
 
 association_premises = sqla.Table(
@@ -40,51 +42,57 @@ association_premises = sqla.Table(
 )
 
 
-class SolutionItem(Base):
-    id = sqla.Column(sqla.Integer, primary_key=True)
-    __tablename__ = "solution_item"
-    solution_id = sqla.Column(
-        sqla.Integer, sqla.ForeignKey("solution.id"), nullable=False
-    )
-    solution = relationship("Solution")
-    premise_id = sqla.Column(sqla.Integer, sqla.ForeignKey(Formula.id), nullable=False)
-    premise = relationship(Formula)
+association_problem_imports = sqla.Table(
+    "problem_imports",
+    Base.metadata,
+    sqla.Column("problem_id", sqla.Integer, sqla.ForeignKey("problem.id"), nullable=False),
+    sqla.Column(
+        "source_id", sqla.Integer, sqla.ForeignKey("source.id"), nullable=False
+    ),
+)
 
 
 class Problem(Base):
     __tablename__ = "problem"
     id = sqla.Column(sqla.Integer, primary_key=True)
     domain = sqla.Column(sqla.VARCHAR(4))
-    source_id = sqla.Column(sqla.Integer, sqla.ForeignKey(Source.id), nullable=False)
     source = relationship(Source)
-    conjecture_id = sqla.Column(
-        sqla.Integer, sqla.ForeignKey(Formula.id), nullable=False
-    )
-    conjecture = relationship(Formula)
-    imports = relation(Source)
+    source_id = sqla.Column(sqla.Integer, sqla.ForeignKey(Source.id), nullable=False, unique=True)
+    conjectures = relationship(Formula, back_populates="conjecture_in_problem")
+    imports = relationship(Source, secondary=association_problem_imports)
     original_premises = relationship(Formula, secondary=association_premises)
-    solutions = relation("Solution")
-
-    __table_args__ = (
-        sqla.UniqueConstraint("source_id", "conjecture_id", name="conjecture_source"),
-    )
 
     def create_problem_file(self, file):
         for premise in self.premises:
             file.write(premise.original)
 
+    def all_premises(self, session):
+        for p in self.original_premises:
+            yield p
+        for p in session.query(Formula).filter(Formula.source_id.in_(self.imports)):
+            yield p
+
+
+association_used_premises = sqla.Table(
+    "solution_premises",
+    Base.metadata,
+    sqla.Column("solution_id", sqla.Integer, sqla.ForeignKey("solution.id"), nullable=False),
+    sqla.Column(
+        "formula_id", sqla.Integer, sqla.ForeignKey("formula.id"), nullable=False
+    ),
+)
 
 class Solution(Base):
     __tablename__ = "solution"
     id = sqla.Column(sqla.Integer, primary_key=True)
     problem_id = sqla.Column(sqla.Integer, sqla.ForeignKey("problem.id"))
     problem = relationship(Problem)
-    premises = relation(SolutionItem)
+    premises = relationship(Formula, secondary=association_used_premises)
 
 
 def store_formula(
     source_name,
-    struc: problem.AnnotatedFormula,
+    struc: tptp_problem.AnnotatedFormula,
     session=None,
     source=None,
     skip_existence_check=False,
@@ -105,7 +113,6 @@ def store_formula(
             logic=compiler.visit(struc.logic),
         )
         structure.source = source
-        session.add(structure)
     return structure
 
 
@@ -122,15 +129,21 @@ def store_problem(parser, problem_path: str, session=None):
         source, new_source = get_or_create(session, Source, path=source_name)
         if new_source:
             print(problem_path)
-            for problem in parser.parse_from_file(problem_path):
+            print("Parse")
+            original_premises = []
+            imports = []
+            problem = parser.parse_from_file(problem_path)
+            print("Build database model")
+            # A problem is created for each individual conjecture.
+            # They all share premises and imports, so we have to import
+            # those only once
+            if not original_premises:
                 original_premises = [
-                    store_formula(source_name, premise, session=session)
+                    store_formula(source_name, premise, session=session, source=source, skip_existence_check=True)
                     for premise in problem.premises
                 ]
-                conjecture = store_formula(
-                    source_name, problem.conjecture, session=session
-                )
-                imports = []
+            conjectures = [store_formula(source_name, c, session=session, source=source) for c in problem.conjectures]
+            if not imports:
                 for imp in problem.imports:
                     sub, new_source = get_or_create(session, Source, path=imp.path)
                     if new_source:
@@ -141,24 +154,28 @@ def store_problem(parser, problem_path: str, session=None):
                             session=session,
                         )
                     imports.append(sub)
-                p = Problem(
-                    source=source,
-                    original_premises=original_premises,
-                    conjecture=conjecture,
-                )
-                session.add(p)
+            p = Problem(
+                source=source,
+                original_premises=original_premises,
+                conjectures=conjectures,
+                imports=imports,
+            )
+            print("Add")
+            session.add(p)
+        else:
+            print("Skipping", problem_path)
 
-
-def store_all(path, parser, processor, compiler):
+@with_session
+def store_all(path, parser, processor, compiler, **kwargs):
     if os.path.isdir(path):
         for sub_path in os.listdir(path):
             sub_path = os.path.join(path, sub_path)
             if os.path.isfile(sub_path):
-                processor(parser, sub_path)
+                processor(parser, sub_path, **kwargs)
             else:
-                store_all(sub_path, parser, processor, compiler)
+                store_all(sub_path, parser, processor, compiler, **kwargs)
     elif os.path.isfile(path):
-        processor(parser, path)
+        processor(parser, path, **kwargs)
 
 
 def store_file(path, parser, compiler, session=None):
@@ -172,9 +189,7 @@ def store_file(path, parser, compiler, session=None):
         source, created = get_or_create(session, Source, path=path)
         if not source.complete:
             i = 0
-            for struc in map(
-                parser.parse_single_from_string, parser.stream_formulas(path)
-            ):
+            for struc in parser.parse_from_file(path):
                 i += 1
                 store_formula(
                     path,
@@ -203,17 +218,14 @@ def is_source_complete(source, session=None):
     return source_obj.complete
 
 
-def load_solution_from_problem(problem):
-    _load_solution(problem.domain, problem.name)
-    return (problem,)
-
-
 @with_session
-def store_all_solutions(session):
-    for problem, solution in map(
-        parse_solution, map(load_solution_from_problem, session.query(Problem))
-    ):
-        s = Solution()
-        for ax in (a for a in problem.original_premises if a in solution.used_axioms):
-            session.add(SolutionItem(solution=s, premise=ax))
-        session.add(s)
+def store_all_solutions(proof_parser: ProofParser, session=None):
+    for problem in session.query(Problem):
+        pname = os.path.basename(problem.source.path)[:-2]
+        domain = pname[:3]
+        solution = parse_solution(_load_solution(domain, pname))
+        if solution is not None:
+            axiom_names = [ax.name for ax in solution.used_axioms]
+            s = Solution(premises=[a for a in problem.all_premises(session) if a.name in axiom_names])
+            #session.add(s)
+            print(s)

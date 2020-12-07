@@ -42,16 +42,15 @@ def with_session(wrapped_function):
     def inside(*args, **kwargs):
         if "session" not in kwargs:
             engine = get_engine()
-            Session = sessionmaker(bind=engine)
+            Session = sessionmaker(bind=engine, autocommit=True, autoflush=True)
             session = Session()
             try:
                 result = wrapped_function(*args, session=session, **kwargs)
-                session.commit()
+                print("Commit")
             except:
                 session.rollback()
                 raise
             finally:
-                session.flush()
                 session.close()
         else:
             result = wrapped_function(*args, **kwargs)

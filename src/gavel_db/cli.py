@@ -18,7 +18,7 @@ __all__ = ["db"]
 import os
 
 import gavel.config.settings as settings
-from gavel.dialects.tptp.parser import TPTPProblemParser
+from gavel.dialects.tptp.parser import TPTPProblemParser, SimpleTPTPProofParser
 from gavel_db.dialects.db.structures import store_all
 from gavel_db.dialects.db.compiler import JSONCompiler
 from gavel_db.dialects.db.structures import store_all_solutions, store_problem
@@ -48,7 +48,8 @@ def store_problems(path, r):
 
 @click.command()
 def store_solutions():
-    store_all_solutions()
+    proof_parser = SimpleTPTPProofParser()
+    store_all_solutions(proof_parser)
 
 
 @click.command()

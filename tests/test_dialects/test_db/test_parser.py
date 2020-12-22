@@ -1,13 +1,6 @@
-import cProfile
-import pstats
-import unittest
-from os.path import join
+from unittest import TestCase
 
-import pytest
-
-import gavel.dialects.db.structures as fol_db
-from gavel.config.settings import TPTP_ROOT
-from gavel.dialects.db.connection import with_session
+import gavel_db.dialects.db.structures as fol_db
 from gavel.dialects.tptp.compiler import TPTPCompiler
 from gavel.dialects.tptp.parser import TPTPParser
 
@@ -32,11 +25,9 @@ axioms = ["GRP001-0.ax"]
 problems = ["ALG/ALG001-1.p", "NUN/NUN030^1.p"]
 
 
-class DBTest(unittest.TestCase):
-    @classmethod
-    def setup_class(cls):
-        fol_db.create_tables()
+class TestParser(TestCase):
 
-    @classmethod
-    def teardown_class(cls):
-        fol_db.drop_tables()
+    def test_imports(self):
+        pass
+
+

@@ -1,11 +1,10 @@
 from click.testing import CliRunner
 
-from gavel_db.cli import cli
+from gavel.cli import cli
 
 
 def test_main():
     runner = CliRunner()
-    result = runner.invoke(cli, [])
+    result = runner.invoke(cli, ["--help"])
 
-    assert result.output == "()\n"
     assert result.exit_code == 0

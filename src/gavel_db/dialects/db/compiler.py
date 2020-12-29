@@ -106,7 +106,7 @@ class JSONCompiler(Compiler):
             else_clause=conditional.else_clause,
         )
 
-    def visit_import(self, imp: fol.Import):
+    def visit_import(self, imp: problem.Import):
         return dict(type="import", path=imp.path)
 
     def visit_variable(self, variable: fol.Variable):

@@ -69,7 +69,7 @@ class Problem(Base):
     def all_premises(self, session):
         for p in self.original_premises:
             yield p
-        for p in session.query(Formula).filter(Formula.source_id.in_(self.imports)):
+        for p in session.query(Formula).filter(Formula.source_id.in_([s.id for s in self.imports])):
             yield p
 
 
@@ -130,18 +130,16 @@ def store_problem(parser, problem_path: str, session=None):
         if new_source:
             print(problem_path)
             print("Parse")
-            original_premises = []
             imports = []
             problem = parser.parse_from_file(problem_path)
             print("Build database model")
             # A problem is created for each individual conjecture.
             # They all share premises and imports, so we have to import
             # those only once
-            if not original_premises:
-                original_premises = [
-                    store_formula(source_name, premise, session=session, source=source, skip_existence_check=True)
-                    for premise in problem.premises
-                ]
+            original_premises = [
+                store_formula(source_name, premise, session=session, source=source, skip_existence_check=True)
+                for premise in problem.premises
+            ]
             conjectures = [store_formula(source_name, c, session=session, source=source) for c in problem.conjectures]
             if not imports:
                 for imp in problem.imports:
@@ -226,6 +224,8 @@ def store_all_solutions(proof_parser: ProofParser, session=None):
         solution = parse_solution(_load_solution(domain, pname))
         if solution is not None:
             axiom_names = [ax.name for ax in solution.used_axioms]
-            s = Solution(premises=[a for a in problem.all_premises(session) if a.name in axiom_names])
-            #session.add(s)
-            print(s)
+            available_premises = list(problem.all_premises(session))
+            s = Solution(premises=[a for a in available_premises if a.name in axiom_names])
+            session.add(s)
+            #print(s)
+            #print(s.premises)

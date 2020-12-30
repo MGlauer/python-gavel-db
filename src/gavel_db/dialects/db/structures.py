@@ -85,7 +85,7 @@ association_used_premises = sqla.Table(
 class Solution(Base):
     __tablename__ = "solution"
     id = sqla.Column(sqla.Integer, primary_key=True)
-    problem_id = sqla.Column(sqla.Integer, sqla.ForeignKey("problem.id"))
+    problem_id = sqla.Column(sqla.Integer, sqla.ForeignKey("problem.id"), nullable=False)
     problem = relationship(Problem)
     premises = relationship(Formula, secondary=association_used_premises)
 
@@ -225,7 +225,7 @@ def store_all_solutions(proof_parser: ProofParser, session=None):
         if solution is not None:
             axiom_names = [ax.name for ax in solution.used_axioms]
             available_premises = list(problem.all_premises(session))
-            s = Solution(premises=[a for a in available_premises if a.name in axiom_names])
+            s = Solution(problem=problem, premises=[a for a in available_premises if a.name in axiom_names])
             session.add(s)
             #print(s)
             #print(s.premises)

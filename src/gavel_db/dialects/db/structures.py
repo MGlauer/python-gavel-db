@@ -220,12 +220,17 @@ def is_source_complete(source, session=None):
 def store_all_solutions(proof_parser: ProofParser, session=None):
     for problem in session.query(Problem):
         pname = os.path.basename(problem.source.path)[:-2]
+        print(problem.id, pname)
         domain = pname[:3]
-        solution = parse_solution(_load_solution(domain, pname))
-        if solution is not None:
-            axiom_names = [ax.name for ax in solution.used_axioms]
-            available_premises = list(problem.all_premises(session))
-            s = Solution(problem=problem, premises=[a for a in available_premises if a.name in axiom_names])
-            session.add(s)
-            #print(s)
-            #print(s.premises)
+        if session.query(Solution).filter(Solution.problem == problem).first() is not None:
+            print("Already solved")
+        else:
+            solution = parse_solution(_load_solution(domain, pname))
+            if solution is not None:
+                print("Store solution")
+                axiom_names = [ax.name for ax in solution.used_axioms]
+                available_premises = list(problem.all_premises(session))
+                s = Solution(problem=problem, premises=[a for a in available_premises if a.name in axiom_names])
+                session.add(s)
+            else:
+                print("No solution found")

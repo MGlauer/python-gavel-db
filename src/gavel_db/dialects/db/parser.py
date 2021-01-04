@@ -33,13 +33,12 @@ class DBLogicParser(LogicParser):
         return meth(obj)
 
     def parse_quantifier(self, quantifier: dict):
-        if quantifier.get("type") == "existential":
-            q = logic.Quantifier.EXISTENTIAL
-        elif quantifier.get("type") == "universial":
-            q = logic.Quantifier.UNIVERSAL
+        if quantifier.get("quantifier") == "existential":
+            return logic.Quantifier.EXISTENTIAL
+        elif quantifier.get("quantifier") == "universial":
+            return logic.Quantifier.UNIVERSAL
         else:
             raise NotImplementedError
-        return dict(type="quantifier", quantifier=q)
 
     def parse_formula_role(self, role: dict):
         return getattr(logic.FormulaRole, role["formula_role"].upper())
@@ -67,7 +66,7 @@ class DBLogicParser(LogicParser):
         )
 
     def parse_annotated_formula(self, anno: dict):
-        return logic.AnnotatedFormula(
+        return problem.AnnotatedFormula(
             formula=self._parse_rec(anno["formula"]),
             name=anno["name"],
             role=self._parse_rec(anno["role"]),
@@ -89,7 +88,7 @@ class DBLogicParser(LogicParser):
 
     def parse_predicate_expression(self, expression: dict) -> logic.PredicateExpression:
         return logic.PredicateExpression(
-            predicate=self._parse_rec(expression["functor"]),
+            predicate=self._parse_rec(expression["predicate"]),
             arguments=[self._parse_rec(a) for a in expression["arguments"]],
         )
 
@@ -100,7 +99,7 @@ class DBLogicParser(LogicParser):
             else_clause=self._parse_rec(conditional["else_clause"]),
         )
 
-    def parse_import(self, imp: dict) -> logic.Import:
+    def parse_import(self, imp: dict) -> problem.Import:
         return logic.Import(path=imp["path"])
 
     def parse_variable(self, variable: dict) -> logic.Variable:
@@ -115,3 +114,6 @@ class DBLogicParser(LogicParser):
             conjecture=self._parse_rec(problem["conjecture"]),
             imports=self._parse_rec(problem["imports"]),
         )
+
+    def parse_distinct_object(self, obj):
+        return logic.DistinctObject(obj["symbol"])

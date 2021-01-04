@@ -21,6 +21,10 @@ class DBProblemParser(ProblemParser):
 class DBLogicParser(LogicParser):
     def _parse_rec(self, obj, *args, **kwargs):
         if isinstance(obj, str):
+            if obj == "$true":
+                return logic.DefinedConstant(logic.PredefinedConstant.VERUM)
+            if obj == "$false":
+                return logic.DefinedConstant(logic.PredefinedConstant.FALSUM)
             return obj
         meth = getattr(self, "parse_%s" % obj.get("type"), None)
 

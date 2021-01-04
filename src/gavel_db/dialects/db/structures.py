@@ -3,12 +3,17 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from gavel_db.dialects.db.connection import with_session, get_or_create, get_or_None
 from gavel_db.dialects.db.compiler import JSONCompiler
+from gavel_db.dialects.db.parser import DBLogicParser
 from gavel.logic import problem as tptp_problem
 from gavel.dialects.base.parser import ProofParser
 from gavel.dialects.tptp.parser import _load_solution, parse_solution, TPTPProblemParser
 from gavel.config import settings as settings
 import os
 import multiprocessing as mp
+import sys
+import json
+
+sys.setrecursionlimit(10000)
 
 Base = declarative_base()
 
@@ -232,3 +237,12 @@ def store_all_solutions(proof_parser: ProofParser, session=None):
                 session.add(s)
             else:
                 print("No solution found")
+
+
+@with_session
+def store_df(path, session):
+    jc = JSONCompiler()
+    dbp = DBLogicParser()
+    with open(path,"w") as of:
+        for f in session.query(Formula.json).yield_per(10):
+            of.write(json.dumps(jc.visit(dbp._parse_rec(f[0]))))

@@ -241,8 +241,10 @@ def store_all_solutions(proof_parser: ProofParser, session=None):
 
 @with_session
 def store_df(path, session):
+    import random
     jc = JSONCompiler()
     dbp = DBLogicParser()
-    with open(path,"w") as of:
+    with open(path, "w") as of:
         for f in session.query(Formula.json).yield_per(10):
-            of.write(json.dumps(jc.visit(dbp._parse_rec(f[0]))))
+            if random.random() < 0.001:
+                of.write(json.dumps(jc.visit(dbp._parse_rec(f[0])))+ "\n")

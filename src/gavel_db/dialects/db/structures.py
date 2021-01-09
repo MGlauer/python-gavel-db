@@ -222,18 +222,22 @@ def is_source_complete(source, session=None):
 
 
 @with_session
-def store_all_solutions(proof_parser: ProofParser, session=None):
+def _get_problem_paths(session):
+    return [(problem.id, problem.source.path) for problem in session.query(Problem)]
+
+
+def store_all_solutions(proof_parser: ProofParser):
     solutions = []
-    for problem in session.query(Problem):
-        pname = os.path.basename(problem.source.path)[:-2]
-        print(problem.id, pname)
+    paths = _get_problem_paths()
+    for pid, problem_path in paths:
+        pname = os.path.basename(problem_path)[:-2]
+        print(pid, pname)
         domain = pname[:3]
         if domain != "SYN":
             solution = parse_solution(_load_solution(domain, pname))
             if solution is not None:
-
                 axiom_names = [str(ax.name) for ax in solution.used_axioms]
-                d = dict(path=problem.source.path, used=axiom_names)
+                d = dict(path=problem_path, used=axiom_names)
                 print("Store solution:", d)
                 solutions.append(d)
             else:

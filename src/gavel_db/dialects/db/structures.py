@@ -228,9 +228,13 @@ def _get_problem_paths(session):
 
 def store_all_solutions(proof_parser: ProofParser):
     paths = _get_problem_paths()
-    with open("/tmp/solutions.json", "r") as f:
-        solved = {json.loads(line)["path"] for line in f}
-    with open("/tmp/solutions.json", "a") as f:
+    file_path = "/tmp/solutions.json"
+    if os.path.isfile(file_path):
+        with open(file_path, "r") as f:
+            solved = {json.loads(line)["path"] for line in f}
+    else:
+        solved = []
+    with open(file_path, "a") as f:
         for pid, problem_path in paths:
             if problem_path not in solved:
                 pname = os.path.basename(problem_path)[:-2]

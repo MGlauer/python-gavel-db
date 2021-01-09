@@ -229,21 +229,21 @@ def _get_problem_paths(session):
 def store_all_solutions(proof_parser: ProofParser):
     solutions = []
     paths = _get_problem_paths()
-    for pid, problem_path in paths:
-        pname = os.path.basename(problem_path)[:-2]
-        print(pid, pname)
-        domain = pname[:3]
-        if domain != "SYN":
-            solution = parse_solution(_load_solution(domain, pname))
-            if solution is not None:
-                axiom_names = [str(ax.name) for ax in solution.used_axioms]
-                d = dict(path=problem_path, used=axiom_names)
-                print("Store solution:", d)
-                solutions.append(d)
-            else:
-                print("No solution found")
-    with open("/tmp/solutions.json") as f:
-        json.dump(solutions,f)
+    with open("/tmp/solutions.json", "a") as f:
+        for pid, problem_path in paths:
+            pname = os.path.basename(problem_path)[:-2]
+            print(pid, pname)
+            domain = pname[:3]
+            if domain != "SYN":
+                solution = parse_solution(_load_solution(domain, pname))
+                if solution is not None:
+                    axiom_names = [str(ax.name) for ax in solution.used_axioms]
+                    d = dict(path=problem_path, used=axiom_names)
+                    print("Store solution:", d)
+                    solutions.append(d)
+                else:
+                    print("No solution found")
+                f.write(json.dumps(solutions))
 
 
 @with_session

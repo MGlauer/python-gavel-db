@@ -227,7 +227,6 @@ def _get_problem_paths(session):
 
 
 def store_all_solutions(proof_parser: ProofParser):
-    solutions = []
     paths = _get_problem_paths()
     with open("/tmp/solutions.json", "a") as f:
         for pid, problem_path in paths:
@@ -240,10 +239,10 @@ def store_all_solutions(proof_parser: ProofParser):
                     axiom_names = [str(ax.name) for ax in solution.used_axioms]
                     d = dict(path=problem_path, used=axiom_names)
                     print("Store solution:", d)
-                    solutions.append(d)
+                    f.write(json.dumps(d))
                 else:
                     print("No solution found")
-                f.write(json.dumps(solutions))
+
 
 
 @with_session
